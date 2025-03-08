@@ -1,26 +1,27 @@
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from pymongo import MongoClient
 from datetime import datetime
 
-# Authenticate Google Sheets API
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-client = gspread.authorize(creds)
+# Connect to MongoDB (Localhost)
+client = MongoClient("mongodb://localhost:27017/")
+db = client["BluBeepDB"]  # Database
+attendance_collection = db["AttendanceRecords"]  # Collection
 
-# Open Google Sheet
-SHEET_NAME = "BluBeep_Attendance"
-spreadsheet = client.open(SHEET_NAME).sheet1
+def record_attendance(student_name, device_id):
+    """Store attendance records in MongoDB"""
+    record = {
+        "student_name": student_name,
+        "device_id": device_id,
+        "timestamp": datetime.utcnow()
+    }
+    attendance_collection.insert_one(record)
+    print(f"✅ Attendance recorded for {student_name}")
 
-def record_attendance(student_name, device_address):
-    """Logs attendance with timestamp in Google Sheets."""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    spreadsheet.append_row([timestamp, student_name, device_address])
+def fetch_attendance(filter_by=None):
+    """Fetch attendance records from MongoDB"""
+    query = {}  # Default: Fetch all
 
-def fetch_attendance(search_query=None):
-    """Fetches attendance data, filtered by name or date."""
-    records = spreadsheet.get_all_values()[1:]  # Skip headers
+    if filter_by:
+        query = {"student_name": {"$regex": filter_by, "$options": "i"}}  # Case-insensitive search
 
-    if search_query:
-        records = [row for row in records if search_query.lower() in row[1].lower() or search_query in row[0]]
-    
-    return records
+    records = attendance_collection.find(query).sort("timestamp", -1)  # Sort by latest
+    return list(records)  # Convert cursor to list
