@@ -4,6 +4,8 @@ from kivy.uix.recycleview import RecycleView
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.label import Label
+from kivy.clock import Clock
+import threading
 from attendance_manager import record_attendance, fetch_attendance
 from bluetooth_scanner import get_bluetooth_devices
 
@@ -45,11 +47,45 @@ class BluBeepUI(BoxLayout):
 
     def scan_and_record(self, instance):
         """Scan for Bluetooth devices and record attendance"""
-        devices = get_bluetooth_devices()
+        # Disable button during scan
+        self.scan_button.text = "🔄 Scanning..."
+        self.scan_button.disabled = True
+        
+        # Run scan in separate thread
+        threading.Thread(target=self._perform_scan, daemon=True).start()
+
+    def _perform_scan(self):
+        """Perform the actual scan in a separate thread"""
+        try:
+            devices = get_bluetooth_devices()
+            # Schedule UI update on main thread
+            Clock.schedule_once(lambda dt: self._on_scan_complete(devices), 0)
+        except Exception as e:
+            print(f"Scan error: {e}")
+            Clock.schedule_once(lambda dt: self._on_scan_error(e), 0)
+
+    def _on_scan_complete(self, devices):
+        """Handle scan completion on main thread"""
         if devices:
             for name, addr in devices:
                 record_attendance(name, addr)
             self.update_attendance_list()
+            self.scan_button.text = f"✅ Found {len(devices)} devices"
+        else:
+            self.scan_button.text = "❌ No devices found"
+        
+        # Re-enable button after 2 seconds
+        Clock.schedule_once(self._reset_button, 2)
+
+    def _on_scan_error(self, error):
+        """Handle scan error on main thread"""
+        self.scan_button.text = f"❌ Scan failed"
+        Clock.schedule_once(self._reset_button, 2)
+
+    def _reset_button(self, dt):
+        """Reset button to original state"""
+        self.scan_button.text = "🔍 Scan Bluetooth Devices"
+        self.scan_button.disabled = False
 
     def update_attendance_list(self):
         """Fetch and display attendance records"""

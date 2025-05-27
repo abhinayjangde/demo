@@ -2,10 +2,10 @@ from pymongo import MongoClient
 from datetime import datetime
 
 # Connect to MongoDB (Localhost)
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient("mongodb://root:example@127.0.0.1:27017/?authSource=admin")
 db = client["BluBeepDB"]  # Database
 attendance_collection = db["AttendanceRecords"]  # Collection
-
+print("DATABASE CONNECTION+++++++++++++++++++++++++++++++++++++++++++++++++++++++", client)
 def record_attendance(student_name, device_id):
     """Store attendance records in MongoDB"""
     record = {
@@ -15,7 +15,7 @@ def record_attendance(student_name, device_id):
     }
     attendance_collection.insert_one(record)
     print(f"✅ Attendance recorded for {student_name}")
-
+    
 def fetch_attendance(filter_by=None):
     """Fetch attendance records from MongoDB"""
     query = {}  # Default: Fetch all
